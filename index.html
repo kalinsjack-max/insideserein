@@ -781,7 +781,9 @@
 <!-- ════════════════════════════════════════ -->
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
-    <div class="login-brand-circle">S</div>
+    <div class="login-brand-circle">
+  <img src="serein.png" alt="Serein" style="width:100%;height:100%;object-fit:cover;border-radius:50%">
+</div>
     <div class="login-title">Serein By Sen</div>
     <div class="login-sub">Business Manager</div>
     
@@ -840,7 +842,7 @@
 <div class="sidebar" id="sidebar">
   <div class="brand">
     <div class="brand-circle">
-      <img src="" id="brandImg" alt="Serein">
+      <img src="serein.png" id="brandImg" alt="Serein">
       <span id="brandInitial" style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;color:var(--red);">S</span>
     </div>
     <div class="brand-name">Serein</div>
@@ -2658,8 +2660,8 @@ function init() {
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   document.getElementById('footerYear').textContent = new Date().getFullYear();
   
-  document.getElementById('brandImg').style.display = 'none';
-  document.getElementById('brandInitial').style.display = 'block';
+  document.getElementById('brandImg').style.display = 'block';
+document.getElementById('brandInitial').style.display = 'none';
 
   initReport();
   renderDashboard();
