@@ -776,7 +776,6 @@
   .sync-status.online { color: var(--green); }
   .sync-status.offline { color: var(--gold); }
 </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -1549,7 +1548,7 @@ function logout() {
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
     document.getElementById('loginError').classList.remove('show');
-  });
+  }).catch(err => console.error("Logout error:", err));
 }
 
 function resetPassword() {
@@ -1563,7 +1562,8 @@ function resetPassword() {
 
 function checkAutoLogin() {
   return new Promise((resolve) => {
-    auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      unsubscribe();
       if (user) {
         currentUser = user;
         loadFirestoreData();
@@ -1613,21 +1613,24 @@ function loadFirestoreData() {
       appData.orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       renderDashboard();
       renderOrders();
-    });
+    })
+    .catch(err => console.error("Error loading orders:", err));
   
   // Load expenses  
   db.collection('users').doc(userId).collection('expenses').get()
     .then((snapshot) => {
       appData.expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       renderExpenses();
-    });
+    })
+    .catch(err => console.error("Error loading expenses:", err));
     
   // Load returns
   db.collection('users').doc(userId).collection('returns').get()
     .then((snapshot) => {
       appData.returns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       renderReturns();
-    });
+    })
+    .catch(err => console.error("Error loading returns:", err));
     
   // Load settings
   db.collection('users').doc(userId).get()
@@ -1635,7 +1638,8 @@ function loadFirestoreData() {
       if (doc.exists && doc.data().settings) {
         appData.settings = doc.data().settings;
       }
-    });
+    })
+    .catch(err => console.error("Error loading settings:", err));
 }
 
 function saveToFirestore(collection, data) {
@@ -1645,13 +1649,17 @@ function saveToFirestore(collection, data) {
   }
   const userId = currentUser.uid;
   db.collection('users').doc(userId).collection(collection).doc(data.id).set(data)
-    .catch(() => saveLocalData()); // Fallback on error
+    .catch((err) => {
+      console.error("Firestore save error:", err);
+      saveLocalData();
+    });
 }
 
 function deleteFromFirestore(collection, id) {
   if (!currentUser) return;
   const userId = currentUser.uid;
-  db.collection('users').doc(userId).collection(collection).doc(id).delete();
+  db.collection('users').doc(userId).collection(collection).doc(id).delete()
+    .catch(err => console.error("Firestore delete error:", err));
 }
 
 // ════════════════════════════════
@@ -2653,7 +2661,8 @@ function saveSettings() {
   };
   saveLocalData();
   if (currentUser) {
-    db.collection('users').doc(currentUser.uid).set({ settings: appData.settings }, { merge: true });
+    db.collection('users').doc(currentUser.uid).set({ settings: appData.settings }, { merge: true })
+      .catch(err => console.error("Error saving settings:", err));
   }
   showToast('Settings saved! ✅');
 }
@@ -2744,11 +2753,20 @@ document.getElementById('brandInitial').style.display = 'none';
 }
 
 // Check auto-login on page load
+// Ensure login screen shows by default while Firebase loads
+document.getElementById('loginScreen').style.display = 'flex';
+document.getElementById('appContainer').style.display = 'none';
+
+// Check auth state after Firebase initializes
 checkAutoLogin().then((loggedIn) => {
   if (!loggedIn) {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'none';
   }
+}).catch((err) => {
+  console.error("Auth check error:", err);
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appContainer').style.display = 'none';
 });
 </script>
 </body>
