@@ -3224,29 +3224,206 @@ function renderReport() {
    PDF EXPORT (unchanged logic, same quality)
 ════════════════════════════════════ */
 function exportPDF() {
-  const month  = parseInt(document.getElementById('reportMonth')?.value ?? new Date().getMonth());
-  const year   = parseInt(document.getElementById('reportYear')?.value  ?? new Date().getFullYear());
-  const mName  = ['January','February','March','April','May','June','July','August','September','October','November','December'][month];
+  const month = parseInt(document.getElementById('reportMonth')?.value ?? new Date().getMonth());
+  const year = parseInt(document.getElementById('reportYear')?.value ?? new Date().getFullYear());
+  const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][month];
 
-  const orders   = appData.orders.filter(o   => { const d=new Date(o.date);  return d.getMonth()===month&&d.getFullYear()===year; });
-  const expenses = appData.expenses.filter(e => { const d=new Date(e.date);  return d.getMonth()===month&&d.getFullYear()===year; });
-  const returns  = appData.returns.filter(r  => { const d=new Date(r.date);  return d.getMonth()===month&&d.getFullYear()===year; });
+  const orders = appData.orders.filter(o => {
+    const d = new Date(o.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const expenses = appData.expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const returns = appData.returns.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
 
-  const tSales    = orders.reduce((s,o)=>s+parseFloat(o.sale||0)*parseInt(o.qty||1),0);
-  const tCost     = orders.reduce((s,o)=>s+parseFloat(o.cost||0)*parseInt(o.qty||1),0);
-  const tCollect  = orders.filter(o=>o.payment==='paid').reduce((s,o)=>s+parseFloat(o.sale||0)*parseInt(o.qty||1),0)
-                  + orders.filter(o=>o.payment==='partial').reduce((s,o)=>s+parseFloat(o.paid||0),0);
-  const tExpenses = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
-  const tReturns  = returns.reduce((s,r)=>s+parseFloat(r.amount||0),0);
-  const netProfit = tSales - tCost - tExpenses - tReturns;
+  const totalSales = orders.reduce((s, o) => s + parseFloat(o.sale || 0) * parseInt(o.qty || 1), 0);
+  const totalCost = orders.reduce((s, o) => s + parseFloat(o.cost || 0) * parseInt(o.qty || 1), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const totalReturns = returns.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+  const netProfit = totalSales - totalCost - totalExpenses - totalReturns;
 
-  const {jsPDF} = window.jspdf;
-  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const W=210, H=297;
-  const C = {
-    red:[192,57,43], navy:[30,45,64], gold:[184,134,11],
-    green:[26,158,92], cream:[248,244,239], border:[220,210,200], white:[255,255,255]
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Design Tokens
+  const colors = {
+    navy: [44, 62, 80],
+    red: [192, 57, 43],
+    gold: [184, 134, 11],
+    text: [60, 60, 60],
+    lightText: [120, 120, 120],
+    bg: [247, 243, 230],
+    white: [255, 255, 255],
+    border: [232, 223, 211]
   };
+
+  // --- HEADER DESIGN ---
+  // Background accent
+  doc.setFillColor(...colors.navy);
+  doc.rect(0, 0, 210, 50, 'F');
+  
+  // Brand Name
+  doc.setTextColor(...colors.white);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(26);
+  doc.text("SEREIN", 20, 25);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(200, 200, 200);
+  doc.text("BY SEN — PREMIUM BUSINESS MANAGER", 20, 32);
+
+  // Report Title (Right Aligned)
+  doc.setTextColor(...colors.white);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(`${monthName.toUpperCase()} ${year}`, 190, 25, { align: 'right' });
+  
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 190, 31, { align: 'right' });
+
+  // Contact/Biz Info strip
+  doc.setFillColor(...colors.red);
+  doc.rect(0, 43, 210, 7, 'F');
+  doc.setTextColor(...colors.white);
+  doc.setFontSize(8);
+  const bizInfo = `${appData.settings.bizname} | ${appData.settings.phone || 'Contact Info N/A'} | ${appData.settings.address || ''}`;
+  doc.text(bizInfo, 20, 47.5);
+
+  let yPos = 65;
+
+  // --- TOP STAT CARDS ---
+  const stats = [
+    { label: 'GROSS REVENUE', val: totalSales, color: colors.navy },
+    { label: 'OPERATING EXPENSES', val: totalExpenses + totalReturns, color: colors.red },
+    { label: 'NET PROFIT', val: netProfit, color: netProfit >= 0 ? [39, 174, 96] : colors.red }
+  ];
+
+  const cardW = 55;
+  stats.forEach((s, i) => {
+    const x = 20 + (i * (cardW + 5));
+    doc.setDrawColor(...colors.border);
+    doc.roundedRect(x, yPos, cardW, 22, 2, 2, 'D');
+    
+    doc.setFontSize(7);
+    doc.setTextColor(...colors.lightText);
+    doc.text(s.label, x + (cardW / 2), yPos + 7, { align: 'center' });
+    
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...s.color);
+    doc.text(fmtMoney(s.val), x + (cardW / 2), yPos + 15, { align: 'center' });
+  });
+
+  yPos += 35;
+
+  // --- ORDERS TABLE ---
+  doc.setTextColor(...colors.navy);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Sales Activity", 20, yPos);
+  
+  yPos += 4;
+
+  doc.autoTable({
+    startY: yPos,
+    head: [['ID', 'Date', 'Customer', 'Product', 'Total', 'Payment']],
+    body: orders.map(o => [
+      o.id,
+      fmtDate(o.date),
+      o.customer,
+      `${o.product} ${o.qty > 1 ? '(x' + o.qty + ')' : ''}`,
+      fmtMoney(parseFloat(o.sale) * parseInt(o.qty || 1)),
+      o.payment.toUpperCase()
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+    headStyles: { fillColor: colors.navy, textColor: colors.white, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [250, 250, 250] },
+    margin: { left: 20, right: 20 }
+  });
+
+  yPos = doc.lastAutoTable.finalY + 15;
+
+  // --- EXPENSES TABLE ---
+  if (yPos > 240) { doc.addPage(); yPos = 20; }
+  
+  doc.setTextColor(...colors.navy);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Business Expenses", 20, yPos);
+  
+  yPos += 4;
+
+  doc.autoTable({
+    startY: yPos,
+    head: [['Date', 'Category', 'Description', 'Amount']],
+    body: expenses.map(e => [
+      fmtDate(e.date),
+      e.category.toUpperCase(),
+      e.desc,
+      fmtMoney(e.amount)
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: colors.gold, textColor: colors.white },
+    margin: { left: 20, right: 20 }
+  });
+
+  yPos = doc.lastAutoTable.finalY + 20;
+
+  // --- FINAL PROFIT SUMMARY BOX ---
+  if (yPos > 230) { doc.addPage(); yPos = 20; }
+
+  doc.setFillColor(252, 251, 248);
+  doc.setDrawColor(...colors.border);
+  doc.roundedRect(20, yPos, 170, 45, 3, 3, 'FD');
+
+  doc.setFontSize(11);
+  doc.setTextColor(...colors.navy);
+  doc.setFont("helvetica", "bold");
+  doc.text("Financial Statement Summary", 25, yPos + 10);
+
+  const summaryRows = [
+    { label: "Total Sales Revenue", val: totalSales, bold: false },
+    { label: "Total COGS (Cost of Goods)", val: -totalCost, bold: false },
+    { label: "Total Operating Expenses & Returns", val: -(totalExpenses + totalReturns), bold: false },
+    { label: "NET BUSINESS PROFIT", val: netProfit, bold: true, color: netProfit >= 0 ? [39, 174, 96] : colors.red }
+  ];
+
+  summaryRows.forEach((row, idx) => {
+    const rowY = yPos + 18 + (idx * 7);
+    doc.setFont("helvetica", row.bold ? "bold" : "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...(row.color || colors.text));
+    doc.text(row.label, 25, rowY);
+    doc.text(fmtMoney(row.val), 185, rowY, { align: 'right' });
+    
+    // Draw thin separator for net profit
+    if (idx === 2) {
+      doc.setDrawColor(200, 200, 200);
+      doc.line(25, rowY + 3, 185, rowY + 3);
+    }
+  });
+
+  // Footer on all pages
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(...colors.lightText);
+    doc.text(`Serein By Sen Manager — Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+  }
+
+  doc.save(`Serein_${monthName}_${year}_Report.pdf`);
+  showToast("Beautiful report exported successfully! ✨");
+}
 
   // header
   doc.setFillColor(...C.navy); doc.rect(0,0,W,48,'F');
