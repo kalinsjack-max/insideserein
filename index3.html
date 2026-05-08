@@ -31,12 +31,11 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
- /* Paste this inside your <style> tags */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
 * { 
     font-family: 'Plus Jakarta Sans', sans-serif !important; 
-    letter-spacing: -0.01em; /* Makes text look more professional and 'tight' */
+    letter-spacing: -0.01em; 
 }
 
   /* ─── SIDEBAR ─── */
@@ -489,7 +488,7 @@
 <div class="sidebar">
   <div class="brand">
     <div class="brand-circle">
-      <img src="serein.png" id="brandImg " alt="Serein">
+      <img src="serein.png" id="brandImg" alt="Serein">
       <span id="brandInitial" style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;color:var(--red);display:none">S</span>
     </div>
     <div class="brand-name">Serein</div>
@@ -978,6 +977,9 @@ const uid = () => 'ORD-' + Date.now().toString().slice(-6);
 const expUid = () => 'EXP-' + Date.now().toString().slice(-6);
 const retUid = () => 'RET-' + Date.now().toString().slice(-6);
 
+// Helper for PDF: Use standard text currency BDT because jsPDF doesn't natively render the Taka symbol without custom fonts.
+const safeMoney = (n) => "Tk. " + parseFloat(n || 0).toLocaleString('en-BD', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
 // Filters state
 const filterState = { order: 'all' };
 
@@ -1048,7 +1050,6 @@ function renderDashboard() {
   document.getElementById('dash-profit').className = `stat-value ${netProfit >= 0 ? 'profit-positive' : 'profit-negative'}`;
   document.getElementById('dash-profit-sub').textContent = `Margin: ${margin}%`;
 
-  // Recent orders
   const tbody = document.getElementById('dash-recent-orders');
   const recent = [...orders].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   if (recent.length === 0) {
@@ -1063,8 +1064,6 @@ function renderDashboard() {
       </tr>
     `).join('');
   }
-
-  // Monthly chart
   renderMonthlyChart();
 }
 
@@ -1074,21 +1073,19 @@ function renderMonthlyChart() {
   const year = now.getFullYear();
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   document.getElementById('chartYear').textContent = year;
-
   const monthlySales = months.map((_, i) => {
     return orders.filter(o => {
       const d = new Date(o.date);
       return d.getMonth() === i && d.getFullYear() === year;
     }).reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0);
   });
-
   const maxVal = Math.max(...monthlySales, 1);
   const chart = document.getElementById('monthlyChart');
   chart.innerHTML = monthlySales.map((val, i) => {
     const h = Math.max((val / maxVal) * 90, 2);
     return `
       <div class="chart-bar-wrap">
-        <div class="chart-bar" style="height:${h}px;background:${i === now.getMonth() ? 'var(--red)' : 'var(--border)'}"></div>
+        <div class="chart-bar ${i === now.getMonth() ? 'active' : ''}" style="height:${h}px;background:${i === now.getMonth() ? 'var(--red)' : 'var(--border)'}"></div>
         <div class="chart-bar-label">${months[i]}</div>
       </div>`;
   }).join('');
@@ -1098,7 +1095,6 @@ function renderMonthlyChart() {
 //  ORDERS
 // ════════════════════════════════
 let editingOrderId = null;
-
 function openOrderModal(id = null) {
   editingOrderId = id;
   const today = new Date().toISOString().split('T')[0];
@@ -1147,7 +1143,6 @@ function saveOrder() {
     showToast('Please fill in required fields ✱');
     return;
   }
-
   const order = {
     id: editingOrderId || uid(),
     customer, date, product,
@@ -1160,7 +1155,6 @@ function saveOrder() {
     notes: document.getElementById('o-notes').value,
     createdAt: editingOrderId ? DB.orders.find(x => x.id === editingOrderId)?.createdAt : new Date().toISOString(),
   };
-
   let orders = DB.orders;
   if (editingOrderId) {
     orders = orders.map(o => o.id === editingOrderId ? order : o);
@@ -1193,21 +1187,14 @@ function renderOrders() {
   let orders = DB.orders;
   const search = document.getElementById('orderSearch')?.value.toLowerCase() || '';
   const filter = filterState.order || 'all';
-
-  if (search) orders = orders.filter(o =>
-    o.customer?.toLowerCase().includes(search) ||
-    o.product?.toLowerCase().includes(search) ||
-    o.id?.toLowerCase().includes(search)
-  );
+  if (search) orders = orders.filter(o => o.customer?.toLowerCase().includes(search) || o.product?.toLowerCase().includes(search) || o.id?.toLowerCase().includes(search));
   if (filter !== 'all') orders = orders.filter(o => o.payment === filter);
   orders = orders.sort((a, b) => new Date(b.date) - new Date(a.date));
-
   const tbody = document.getElementById('ordersTable');
   if (orders.length === 0) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">🛍️</div><p>No orders found</p></div></td></tr>';
     return;
   }
-
   tbody.innerHTML = orders.map(o => {
     const total = parseFloat(o.sale) * parseInt(o.qty || 1);
     const cost = parseFloat(o.cost || 0) * parseInt(o.qty || 1);
@@ -1237,7 +1224,6 @@ function renderOrders() {
 //  EXPENSES
 // ════════════════════════════════
 let editingExpenseId = null;
-
 function openExpenseModal(id = null) {
   editingExpenseId = id;
   const today = new Date().toISOString().split('T')[0];
@@ -1266,7 +1252,6 @@ function saveExpense() {
   const desc = document.getElementById('e-desc').value.trim();
   const amount = parseFloat(document.getElementById('e-amount').value);
   if (!date || !desc || isNaN(amount)) { showToast('Please fill in required fields'); return; }
-
   const expense = {
     id: editingExpenseId || expUid(),
     date, desc, amount,
@@ -1275,7 +1260,6 @@ function saveExpense() {
     notes: document.getElementById('e-notes').value,
     createdAt: editingExpenseId ? DB.expenses.find(x => x.id === editingExpenseId)?.createdAt : new Date().toISOString(),
   };
-
   let expenses = DB.expenses;
   if (editingExpenseId) {
     expenses = expenses.map(e => e.id === editingExpenseId ? expense : e);
@@ -1300,21 +1284,18 @@ function renderExpenses() {
   let expenses = DB.expenses;
   const search = document.getElementById('expenseSearch')?.value.toLowerCase() || '';
   const cat = document.getElementById('expCatFilter')?.value || '';
-
   if (search) expenses = expenses.filter(e => e.desc?.toLowerCase().includes(search) || e.category?.toLowerCase().includes(search));
   if (cat) expenses = expenses.filter(e => e.category === cat);
   expenses = expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
-
   const tbody = document.getElementById('expensesTable');
   if (expenses.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">💸</div><p>No expenses found</p></div></td></tr>';
     return;
   }
-
   tbody.innerHTML = expenses.map(e => `
     <tr>
       <td>${fmtDate(e.date)}</td>
-      <td><span class="badge badge-pending" style="background:#F3E5F5;color:#6A1B9A">${e.category}</span></td>
+      <td><span class="badge" style="background:#F3E5F5;color:#6A1B9A">${e.category}</span></td>
       <td>${e.desc}</td>
       <td style="font-weight:600;color:var(--red)">${fmtMoney(e.amount)}</td>
       <td>${e.paidby}</td>
@@ -1342,7 +1323,6 @@ function saveReturn() {
   const date = document.getElementById('r-date').value;
   const amount = parseFloat(document.getElementById('r-amount').value);
   if (!customer || !date || isNaN(amount)) { showToast('Please fill in required fields'); return; }
-
   const ret = {
     id: retUid(), date,
     orderId: document.getElementById('r-orderid').value,
@@ -1389,7 +1369,7 @@ function renderReturns() {
 }
 
 // ════════════════════════════════
-//  REPORTS
+//  REPORTS & PDF EXPORT
 // ════════════════════════════════
 function initReport() {
   const now = new Date();
@@ -1405,350 +1385,123 @@ function renderReport() {
   const month = parseInt(document.getElementById('reportMonth').value);
   const year = parseInt(document.getElementById('reportYear').value);
   const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month];
-
-  const orders = DB.orders.filter(o => {
-    const d = new Date(o.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-  const expenses = DB.expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-  const returns = DB.returns.filter(r => {
-    const d = new Date(r.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-
+  const orders = DB.orders.filter(o => { const d = new Date(o.date); return d.getMonth() === month && d.getFullYear() === year; });
+  const expenses = DB.expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === month && d.getFullYear() === year; });
+  const returns = DB.returns.filter(r => { const d = new Date(r.date); return d.getMonth() === month && d.getFullYear() === year; });
   const totalSales = orders.reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0);
   const totalCost = orders.reduce((s, o) => s + parseFloat(o.cost||0) * parseInt(o.qty||1), 0);
-  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0)
-    + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
+  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0) + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount||0), 0);
   const totalReturns = returns.reduce((s, r) => s + parseFloat(r.amount||0), 0);
-  const grossProfit = totalSales - totalCost;
-  const netProfit = grossProfit - totalExpenses - totalReturns;
-
-  // Group expenses by category
+  const netProfit = totalSales - totalCost - totalExpenses - totalReturns;
   const expByCat = {};
   expenses.forEach(e => { expByCat[e.category] = (expByCat[e.category] || 0) + parseFloat(e.amount||0); });
 
   const body = document.getElementById('reportBody');
   body.innerHTML = `
     <div style="margin-bottom:20px">
-      <h2 style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--navy);margin-bottom:4px">
-        ${monthName} ${year} — Business Report
-      </h2>
+      <h2 style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--navy);margin-bottom:4px">${monthName} ${year} — Business Report</h2>
       <p style="color:var(--text-muted);font-size:13px">Generated on ${fmtDate(new Date())}</p>
     </div>
-
     <div class="summary-row">
-      <div class="summary-box income">
-        <div class="summary-box-label">Total Sales</div>
-        <div class="summary-box-val">${fmtMoney(totalSales)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Collected: ${fmtMoney(totalCollected)}</div>
-      </div>
-      <div class="summary-box expense">
-        <div class="summary-box-label">Total Expenses</div>
-        <div class="summary-box-val">${fmtMoney(totalExpenses + totalReturns)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Returns: ${fmtMoney(totalReturns)}</div>
-      </div>
-      <div class="summary-box profit">
-        <div class="summary-box-label">Net Profit</div>
-        <div class="summary-box-val">${fmtMoney(netProfit)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Margin: ${totalSales > 0 ? ((netProfit/totalSales)*100).toFixed(1) : 0}%</div>
-      </div>
+      <div class="summary-box income"><div class="summary-box-label">Total Sales</div><div class="summary-box-val">${fmtMoney(totalSales)}</div></div>
+      <div class="summary-box expense"><div class="summary-box-label">Total Expenses</div><div class="summary-box-val">${fmtMoney(totalExpenses + totalReturns)}</div></div>
+      <div class="summary-box profit"><div class="summary-box-label">Net Profit</div><div class="summary-box-val">${fmtMoney(netProfit)}</div></div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-      <div>
-        <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--navy);margin-bottom:12px">
-          Orders (${orders.length})
-        </div>
-        <table>
-          <thead><tr><th>ID</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
-          <tbody>
-            ${orders.length === 0 ? '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">No orders</td></tr>'
-              : orders.map(o => `<tr>
-                <td><span class="order-id">${o.id}</span></td>
-                <td>${o.customer}</td>
-                <td>${fmtMoney(o.sale * (o.qty||1))}</td>
-                <td><span class="badge badge-${o.payment}">${o.payment}</span></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--navy);margin-bottom:12px">
-          Expenses (${expenses.length})
-        </div>
-        ${Object.keys(expByCat).length > 0 ? `
-          <table>
-            <thead><tr><th>Category</th><th>Total</th></tr></thead>
-            <tbody>
-              ${Object.entries(expByCat).map(([cat, amt]) => `
-                <tr><td>${cat}</td><td>${fmtMoney(amt)}</td></tr>
-              `).join('')}
-            </tbody>
-          </table>
-        ` : '<p style="color:var(--text-muted);font-size:13px">No expenses recorded</p>'}
-      </div>
+      <div><div style="font-weight:600;margin-bottom:10px">Orders (${orders.length})</div>
+      <table><thead><tr><th>ID</th><th>Customer</th><th>Value</th></tr></thead>
+      <tbody>${orders.map(o => `<tr><td>${o.id.slice(-4)}</td><td>${o.customer}</td><td>${fmtMoney(o.sale*o.qty)}</td></tr>`).join('')}</tbody></table></div>
+      <div><div style="font-weight:600;margin-bottom:10px">Expenses</div>
+      <table><thead><tr><th>Category</th><th>Total</th></tr></thead>
+      <tbody>${Object.entries(expByCat).map(([c, a]) => `<tr><td>${c}</td><td>${fmtMoney(a)}</td></tr>`).join('')}</tbody></table></div>
     </div>
   `;
 }
 
-// ════════════════════════════════
-//  PDF EXPORT
-// ════════════════════════════════
 function exportPDF() {
   const month = parseInt(document.getElementById('reportMonth')?.value ?? new Date().getMonth());
   const year = parseInt(document.getElementById('reportYear')?.value ?? new Date().getFullYear());
   const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month];
-
-  const orders = DB.orders.filter(o => {
-    const d = new Date(o.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-  const expenses = DB.expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-  const returns = DB.returns.filter(r => {
-    const d = new Date(r.date);
-    return d.getMonth() === month && d.getFullYear() === year;
-  });
-
+  const orders = DB.orders.filter(o => { const d = new Date(o.date); return d.getMonth() === month && d.getFullYear() === year; });
+  const expenses = DB.expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === month && d.getFullYear() === year; });
+  const returns = DB.returns.filter(r => { const d = new Date(r.date); return d.getMonth() === month && d.getFullYear() === year; });
   const totalSales = orders.reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0);
   const totalCost = orders.reduce((s, o) => s + parseFloat(o.cost||0) * parseInt(o.qty||1), 0);
-  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0)
-    + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount||0), 0);
   const totalReturns = returns.reduce((s, r) => s + parseFloat(r.amount||0), 0);
   const netProfit = totalSales - totalCost - totalExpenses - totalReturns;
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, H = 297;
+  const C = { red: [114, 28, 36], navy: [26, 34, 56], gold: [197, 160, 89], cream: [253, 251, 249], text: [45, 36, 36], white: [255, 255, 255] };
 
-  const W = 210; const H = 297;
-  const C = { red: [192, 57, 43], navy: [44, 62, 80], gold: [184, 134, 11], green: [39, 174, 96], cream: [247, 243, 238], border: [220, 210, 200], white: [255,255,255] };
-
-  // Header gradient bg
-  doc.setFillColor(...C.navy);
-  doc.rect(0, 0, W, 45, 'F');
-  doc.setFillColor(...C.red);
-  doc.rect(0, 40, W, 5, 'F');
-
-  // Brand
+  // Perfect Header
+  doc.setFillColor(...C.navy); doc.rect(0, 0, W, 45, 'F');
+  doc.setFillColor(...C.red); doc.rect(0, 40, W, 5, 'F');
   doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(28); doc.text('Serein', 20, 22);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(14); doc.text('By Sen', 20, 31);
-  doc.setFontSize(10);
-  doc.setTextColor(200, 180, 170);
-  doc.text('Business Report', 20, 38);
-
-  // Report title
-  doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text(`${monthName} ${year}`, W - 20, 22, { align: 'right' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(180, 170, 165);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 20, 30, { align: 'right' });
-  const settings = DB.settings;
-  if (settings.owner) doc.text(`Owner: ${settings.owner}`, W - 20, 37, { align: 'right' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(28); doc.text('SEREIN', 20, 22);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text('BY SEN LUXURY MANAGEMENT', 20, 31);
+  doc.setFontSize(16); doc.text(`${monthName} ${year}`, W - 20, 22, { align: 'right' });
+  doc.setFontSize(9); doc.setTextColor(200, 200, 200); doc.text(`Folio Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 20, 30, { align: 'right' });
 
   let y = 55;
-
-  // Summary boxes
-  const boxes = [
-    { label: 'Total Sales', val: totalSales, color: C.green, sub: `Collected: ${fmtMoney(totalCollected)}` },
-    { label: 'Total Expenses', val: totalExpenses + totalReturns, color: C.red, sub: `Returns: ${fmtMoney(totalReturns)}` },
-    { label: 'Net Profit', val: netProfit, color: [58, 73, 171], sub: `Margin: ${totalSales > 0 ? ((netProfit/totalSales)*100).toFixed(1) : 0}%` },
-    { label: 'Orders', val: orders.length, color: C.navy, sub: `Expenses logged: ${expenses.length}`, isCount: true },
+  // Professional Summary Section
+  const boxW = (W - 50) / 3;
+  const stats = [
+    { l: 'TOTAL REVENUE', v: safeMoney(totalSales), c: [45, 90, 39] },
+    { l: 'TOTAL OUTFLOW', v: safeMoney(totalExpenses + totalReturns), c: [155, 28, 49] },
+    { l: 'NET PROFIT', v: safeMoney(netProfit), c: [26, 34, 56] }
   ];
-
-  const bw = (W - 40) / 4 - 3;
-  boxes.forEach((b, i) => {
-    const bx = 15 + i * (bw + 4);
-    doc.setFillColor(...C.white);
-    doc.setDrawColor(...C.border);
-    doc.roundedRect(bx, y, bw, 24, 2, 2, 'FD');
-    doc.setFillColor(...b.color);
-    doc.rect(bx, y, bw, 2, 'F');
-    doc.setTextColor(...b.color);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(b.isCount ? 14 : 12);
-    const displayVal = b.isCount ? b.val.toString() : fmtMoney(b.val);
-    doc.text(displayVal, bx + bw/2, y + 12, { align: 'center' });
-    doc.setTextColor(130, 130, 130);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text(b.label.toUpperCase(), bx + bw/2, y + 17, { align: 'center' });
-    doc.text(b.sub, bx + bw/2, y + 21.5, { align: 'center' });
+  stats.forEach((s, i) => {
+    const x = 20 + (i * (boxW + 5));
+    doc.setDrawColor(232, 223, 211); doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, boxW, 25, 2, 2, 'FD');
+    doc.setTextColor(122, 106, 100); doc.setFontSize(7); doc.text(s.l, x + boxW/2, y + 8, { align: 'center' });
+    doc.setTextColor(...s.c); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text(s.v, x + boxW/2, y + 17, { align: 'center' });
   });
 
-  y += 32;
+  y += 38;
+  doc.setTextColor(...C.text); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text('Consolidated Sales Ledger', 20, y);
+  
+  doc.autoTable({
+    startY: y + 5,
+    head: [['Ref ID', 'Date', 'Customer', 'Units', 'Rate', 'Total']],
+    body: orders.map(o => [o.id.slice(-6), fmtDate(o.date), o.customer, o.qty, safeMoney(o.sale), safeMoney(o.sale * o.qty)]),
+    styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+    headStyles: { fillColor: C.navy, textColor: C.white, fontStyle: 'bold' },
+    margin: { left: 20, right: 20 },
+  });
 
-  // Orders table
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...C.navy);
-  doc.text(`Orders (${orders.length})`, 15, y);
-  y += 5;
-
-  if (orders.length > 0) {
-    doc.autoTable({
-      startY: y,
-      head: [['Order ID', 'Date', 'Customer', 'Product', 'Sale Price', 'Cost', 'Profit', 'Payment']],
-      body: orders.map(o => {
-        const total = parseFloat(o.sale||0) * parseInt(o.qty||1);
-        const cost = parseFloat(o.cost||0) * parseInt(o.qty||1);
-        const profit = total - cost;
-        return [
-          o.id, fmtDate(o.date), o.customer,
-          o.product + (o.qty > 1 ? ` ×${o.qty}` : ''),
-          fmtMoney(total), fmtMoney(cost), fmtMoney(profit), o.payment.toUpperCase()
-        ];
-      }),
-      styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
-      headStyles: { fillColor: C.navy, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [250, 247, 243] },
-      columnStyles: {
-        6: { textColor: netProfit >= 0 ? [39,174,96] : [192,57,43], fontStyle: 'bold' },
-        7: { fontStyle: 'bold' }
-      },
-      margin: { left: 15, right: 15 },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  } else {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(160, 160, 160);
-    doc.text('No orders for this period.', 15, y + 5);
-    y += 14;
-  }
-
-  // Expenses table
-  if (y > H - 60) { doc.addPage(); y = 20; }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...C.navy);
-  doc.text(`Expenses (${expenses.length})`, 15, y);
-  y += 5;
-
+  y = doc.lastAutoTable.finalY + 12;
   if (expenses.length > 0) {
+    if (y > H - 60) { doc.addPage(); y = 25; }
+    doc.setFontSize(13); doc.text('Institutional Expenditures', 20, y);
     doc.autoTable({
-      startY: y,
-      head: [['Date', 'Category', 'Description', 'Amount', 'Paid By']],
-      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, fmtMoney(e.amount), e.paidby]),
+      startY: y + 5,
+      head: [['Date', 'Category', 'Description', 'Settlement']],
+      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, safeMoney(e.amount)]),
       styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: C.gold, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [255, 252, 245] },
-      columnStyles: { 3: { textColor: [192,57,43], fontStyle: 'bold' } },
-      margin: { left: 15, right: 15 },
+      headStyles: { fillColor: C.red, textColor: C.white },
+      margin: { left: 20, right: 20 },
     });
-    y = doc.lastAutoTable.finalY + 10;
-  } else {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(160, 160, 160);
-    doc.text('No expenses for this period.', 15, y + 5);
-    y += 14;
+    y = doc.lastAutoTable.finalY + 12;
   }
 
-  // Returns
-  if (returns.length > 0) {
-    if (y > H - 50) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...C.navy);
-    doc.text(`Returns (${returns.length})`, 15, y);
-    y += 5;
-    doc.autoTable({
-      startY: y,
-      head: [['Return ID', 'Date', 'Customer', 'Amount', 'Reason', 'Status']],
-      body: returns.map(r => [r.id, fmtDate(r.date), r.customer, fmtMoney(r.amount), r.reason || '—', r.status]),
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [150, 80, 30], textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
-      margin: { left: 15, right: 15 },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  }
-
-  // P&L Summary
-  if (y > H - 60) { doc.addPage(); y = 20; }
-  doc.setFillColor(...C.cream);
-  doc.setDrawColor(...C.border);
-  doc.roundedRect(15, y, W - 30, 50, 3, 3, 'FD');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...C.navy);
-  doc.text('Profit & Loss Summary', 20, y + 10);
-
-  const rows = [
-    ['Total Revenue (Sales)', fmtMoney(totalSales), C.green],
-    ['Less: Cost of Goods', `(${fmtMoney(totalCost)})`, C.red],
-    ['Less: Operating Expenses', `(${fmtMoney(totalExpenses)})`, C.red],
-    ['Less: Returns / Refunds', `(${fmtMoney(totalReturns)})`, C.red],
-    ['NET PROFIT', fmtMoney(netProfit), netProfit >= 0 ? C.green : C.red],
-  ];
-
-  rows.forEach((r, i) => {
-    const ry = y + 16 + i * 7;
-    if (i === rows.length - 1) {
-      doc.setFillColor(...C.navy);
-      doc.rect(15, ry - 4, W - 30, 9, 'F');
-      doc.setTextColor(...C.white);
-    } else {
-      doc.setTextColor(80, 80, 80);
-    }
-    doc.setFont('helvetica', i === rows.length - 1 ? 'bold' : 'normal');
-    doc.setFontSize(9);
-    doc.text(r[0], 20, ry + 1);
-    doc.setTextColor(...(i === rows.length - 1 ? C.white : r[2]));
-    doc.setFont('helvetica', 'bold');
-    doc.text(r[1], W - 20, ry + 1, { align: 'right' });
-  });
-
-  // New Professional Luxury Footer
-const totalPages = doc.internal.getNumberOfPages();
-for (let p = 1; p <= totalPages; p++) {
+  // Footer for every page
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    
-    // 1. Draw a sophisticated thin gold separator line
-    doc.setDrawColor(197, 160, 89); // Your Gold Accent color
-    doc.setLineWidth(0.5);
-    doc.line(15, H - 15, W - 15, H - 15);
+    doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.4); doc.line(20, H - 20, W - 20, H - 20);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+    doc.text('SEREIN BY SEN', 20, H - 14);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text('OFFICIAL BUSINESS ASSET', 20, H - 10);
+    doc.text('PRIVILEGED & CONFIDENTIAL', W / 2, H - 12, { align: 'center' });
+    doc.setFontSize(8); doc.text(`Folio ${p} of ${totalPages}`, W - 20, H - 12, { align: 'right' });
+  }
 
-    // 2. Set Typography
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100); // Elegant Gray
-
-    // Left: Business Branding
-    doc.setFont('helvetica', 'bold');
-    doc.text('SEREIN BY SEN', 15, H - 10);
-    
-    // Left: Sub-text
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('Official Business Document', 15, H - 6);
-
-    // Center: Confidentiality Stamp
-    doc.setFontSize(7);
-    doc.text('PRIVILEGED & CONFIDENTIAL', W / 2, H - 8, { align: 'center' });
-
-    // Right: Page Numbers with Luxury Style
-    doc.setFontSize(8);
-    doc.text(`Folio ${p} of ${totalPages}`, W - 15, H - 8, { align: 'right' });
-}
-
-  doc.save(`Serein_Report_${monthName}_${year}.pdf`);
-  showToast(`PDF exported: ${monthName} ${year} ✅`);
+  doc.save(`Serein_Folio_${monthName}_${year}.pdf`);
+  showToast('PDF Exported Perfectly ✅');
 }
 
 // ════════════════════════════════
@@ -1763,8 +1516,6 @@ function renderSettings() {
   document.getElementById('set-address').value = s.address || '';
   document.getElementById('set-total-orders').textContent = DB.orders.length;
   document.getElementById('set-total-expenses').textContent = DB.expenses.length;
-  document.getElementById('set-total-returns').textContent = DB.returns.length;
-
   const allDates = [...DB.orders.map(o => o.date), ...DB.expenses.map(e => e.date)].sort();
   document.getElementById('set-data-since').textContent = allDates.length > 0 ? fmtDate(allDates[0]) : '—';
 }
@@ -1781,21 +1532,14 @@ function saveSettings() {
 }
 
 function exportData() {
-  const data = {
-    orders: DB.orders, expenses: DB.expenses,
-    returns: DB.returns, settings: DB.settings,
-    exportedAt: new Date().toISOString(),
-  };
+  const data = { orders: DB.orders, expenses: DB.expenses, returns: DB.returns, settings: DB.settings, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `serein_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `serein_backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
   showToast('Data exported!');
 }
 
 function importDataClick() { document.getElementById('importFile').click(); }
-
 function importData(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1807,60 +1551,36 @@ function importData(e) {
       if (data.expenses) DB.expenses = data.expenses;
       if (data.returns) DB.returns = data.returns;
       if (data.settings) DB.settings = data.settings;
-      renderSettings(); renderDashboard();
-      showToast('Data imported! ✅');
-    } catch {
-      showToast('Error: Invalid file ❌');
-    }
+      renderSettings(); renderDashboard(); showToast('Data imported! ✅');
+    } catch { showToast('Error: Invalid file ❌'); }
   };
   reader.readAsText(file);
 }
 
 function clearAllData() {
-  if (!confirm('Are you sure? This will delete ALL orders, expenses, and returns. This cannot be undone!')) return;
-  if (!confirm('Really sure? All data will be permanently deleted.')) return;
-  localStorage.removeItem('serein_orders');
-  localStorage.removeItem('serein_expenses');
-  localStorage.removeItem('serein_returns');
-  renderSettings(); renderDashboard();
-  showToast('All data cleared');
+  if (!confirm('Are you sure? This cannot be undone!')) return;
+  localStorage.removeItem('serein_orders'); localStorage.removeItem('serein_expenses'); localStorage.removeItem('serein_returns');
+  renderSettings(); renderDashboard(); showToast('All data cleared');
 }
 
-// ════════════════════════════════
-//  UTILITIES
-// ════════════════════════════════
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.classList.remove('open');
-  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
 });
 
-// ════════════════════════════════
-//  INIT
-// ════════════════════════════════
 function init() {
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   document.getElementById('footerYear').textContent = new Date().getFullYear();
-
-  // Fix brand image
   const img = document.getElementById('brandImg');
-  img.onerror = () => {
-    img.style.display = 'none';
-    document.getElementById('brandInitial').style.display = 'block';
-  };
-  img.src = 'https://i.imgur.com/placeholder.png';
-
-  initReport();
-  renderDashboard();
+  img.onerror = () => { img.style.display = 'none'; document.getElementById('brandInitial').style.display = 'block'; };
+  img.src = 'serein.png';
+  initReport(); renderDashboard();
 }
 
 init();
