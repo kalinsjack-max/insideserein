@@ -1714,19 +1714,38 @@ function exportPDF() {
     doc.text(r[1], W - 20, ry + 1, { align: 'right' });
   });
 
-  // Footer
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
+  // New Professional Luxury Footer
+const totalPages = doc.internal.getNumberOfPages();
+for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    doc.setFillColor(...C.navy);
-    doc.rect(0, H - 12, W, 12, 'F');
-    doc.setTextColor(180, 170, 165);
+    
+    // 1. Draw a sophisticated thin gold separator line
+    doc.setDrawColor(197, 160, 89); // Your Gold Accent color
+    doc.setLineWidth(0.5);
+    doc.line(15, H - 15, W - 15, H - 15);
+
+    // 2. Set Typography
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100); // Elegant Gray
+
+    // Left: Business Branding
+    doc.setFont('helvetica', 'bold');
+    doc.text('SEREIN BY SEN', 15, H - 10);
+    
+    // Left: Sub-text
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.text('Serein By Sen — Business Report', 15, H - 4.5);
-    doc.text(`Page ${p} of ${totalPages}`, W - 15, H - 4.5, { align: 'right' });
-    doc.text(`Confidential`, W / 2, H - 4.5, { align: 'center' });
-  }
+    doc.text('Official Business Document', 15, H - 6);
+
+    // Center: Confidentiality Stamp
+    doc.setFontSize(7);
+    doc.text('PRIVILEGED & CONFIDENTIAL', W / 2, H - 8, { align: 'center' });
+
+    // Right: Page Numbers with Luxury Style
+    doc.setFontSize(8);
+    doc.text(`Folio ${p} of ${totalPages}`, W - 15, H - 8, { align: 'right' });
+}
 
   doc.save(`Serein_Report_${monthName}_${year}.pdf`);
   showToast(`PDF exported: ${monthName} ${year} ✅`);
