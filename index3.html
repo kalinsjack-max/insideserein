@@ -1423,85 +1423,133 @@ function exportPDF() {
   const month = parseInt(document.getElementById('reportMonth')?.value ?? new Date().getMonth());
   const year = parseInt(document.getElementById('reportYear')?.value ?? new Date().getFullYear());
   const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month];
+
+  // 1. Data Aggregation
   const orders = DB.orders.filter(o => { const d = new Date(o.date); return d.getMonth() === month && d.getFullYear() === year; });
   const expenses = DB.expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === month && d.getFullYear() === year; });
   const returns = DB.returns.filter(r => { const d = new Date(r.date); return d.getMonth() === month && d.getFullYear() === year; });
+
   const totalSales = orders.reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0);
   const totalCost = orders.reduce((s, o) => s + parseFloat(o.cost||0) * parseInt(o.qty||1), 0);
+  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0) + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount||0), 0);
   const totalReturns = returns.reduce((s, r) => s + parseFloat(r.amount||0), 0);
   const netProfit = totalSales - totalCost - totalExpenses - totalReturns;
+  const margin = totalSales > 0 ? ((netProfit / totalSales) * 100).toFixed(1) : 0;
 
+  // PDF Configuration
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, H = 297;
-  const C = { red: [114, 28, 36], navy: [26, 34, 56], gold: [197, 160, 89], cream: [253, 251, 249], text: [45, 36, 36], white: [255, 255, 255] };
+  const C = { navy: [44, 62, 80], red: [192, 57, 43], gold: [197, 160, 89], white: [255, 255, 255], gray: [100, 100, 100], lightGray: [200, 200, 200] };
 
-  // Perfect Header
+  // Helper to fix the "ó" error: use "Tk." for PDF compatibility
+  const pdfMoney = (n) => "Tk. " + parseFloat(n || 0).toLocaleString('en-BD', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  // ─── HEADER SECTION ───
   doc.setFillColor(...C.navy); doc.rect(0, 0, W, 45, 'F');
   doc.setFillColor(...C.red); doc.rect(0, 40, W, 5, 'F');
-  doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(28); doc.text('SEREIN', 20, 22);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text('BY SEN LUXURY MANAGEMENT', 20, 31);
-  doc.setFontSize(16); doc.text(`${monthName} ${year}`, W - 20, 22, { align: 'right' });
-  doc.setFontSize(9); doc.setTextColor(200, 200, 200); doc.text(`Folio Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 20, 30, { align: 'right' });
 
+  doc.setTextColor(...C.white);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(28); doc.text('Serein', 20, 22);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text('By Sen', 20, 31);
+  doc.setFontSize(10); doc.setTextColor(...C.lightGray); doc.text('Business Report', 20, 38);
+
+  doc.setTextColor(...C.white); doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text(`${monthName} ${year}`, W - 20, 22, { align: 'right' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.lightGray);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 20, 30, { align: 'right' });
+  doc.text(`Owner: ${DB.settings.owner || 'Sen'}`, W - 20, 37, { align: 'right' });
+
+  // ─── STAT BOXES ───
   let y = 55;
-  // Professional Summary Section
-  const boxW = (W - 50) / 3;
-  const stats = [
-    { l: 'TOTAL REVENUE', v: safeMoney(totalSales), c: [45, 90, 39] },
-    { l: 'TOTAL OUTFLOW', v: safeMoney(totalExpenses + totalReturns), c: [155, 28, 49] },
-    { l: 'NET PROFIT', v: safeMoney(netProfit), c: [26, 34, 56] }
+  const boxW = (W - 55) / 4;
+  const statList = [
+    { l: 'TOTAL SALES', v: pdfMoney(totalSales), s: `Collected: ${pdfMoney(totalCollected)}`, c: [39, 174, 96] },
+    { l: 'TOTAL EXPENSES', v: pdfMoney(totalExpenses), s: `Returns: ${pdfMoney(totalReturns)}`, c: [192, 57, 43] },
+    { l: 'NET PROFIT', v: pdfMoney(netProfit), s: `Margin: ${margin}%`, c: [58, 73, 171] },
+    { l: 'ORDERS', v: orders.length.toString(), s: `Expenses logged: ${expenses.length}`, c: C.navy }
   ];
-  stats.forEach((s, i) => {
-    const x = 20 + (i * (boxW + 5));
-    doc.setDrawColor(232, 223, 211); doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, boxW, 25, 2, 2, 'FD');
-    doc.setTextColor(122, 106, 100); doc.setFontSize(7); doc.text(s.l, x + boxW/2, y + 8, { align: 'center' });
-    doc.setTextColor(...s.c); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text(s.v, x + boxW/2, y + 17, { align: 'center' });
+
+  statList.forEach((s, i) => {
+    const x = 15 + (i * (boxW + 5));
+    doc.setDrawColor(220, 220, 220); doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, boxW, 28, 3, 3, 'FD');
+    doc.setFillColor(...s.c); doc.rect(x + 2, y, boxW - 4, 2, 'F');
+    doc.setTextColor(...s.c); doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.text(s.v, x + boxW/2, y + 12, { align: 'center' });
+    doc.setTextColor(...C.gray); doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.text(s.l, x + boxW/2, y + 18, { align: 'center' });
+    doc.setFontSize(6); doc.text(s.s, x + boxW/2, y + 23, { align: 'center' });
   });
 
-  y += 38;
-  doc.setTextColor(...C.text); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text('Consolidated Sales Ledger', 20, y);
+  // ─── ORDERS TABLE ───
+  y += 40;
+  doc.setTextColor(...C.navy); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text(`Orders (${orders.length})`, 15, y);
   
   doc.autoTable({
     startY: y + 5,
-    head: [['Ref ID', 'Date', 'Customer', 'Units', 'Rate', 'Total']],
-    body: orders.map(o => [o.id.slice(-6), fmtDate(o.date), o.customer, o.qty, safeMoney(o.sale), safeMoney(o.sale * o.qty)]),
-    styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+    head: [['Order ID', 'Date', 'Customer', 'Product', 'Sale Price', 'Cost', 'Profit', 'Payment']],
+    body: orders.map(o => [o.id.slice(-6), fmtDate(o.date), o.customer, o.product, pdfMoney(o.sale), pdfMoney(o.cost), pdfMoney(o.sale - o.cost), o.payment.toUpperCase()]),
+    styles: { fontSize: 7, cellPadding: 2.5 },
     headStyles: { fillColor: C.navy, textColor: C.white, fontStyle: 'bold' },
-    margin: { left: 20, right: 20 },
+    alternateRowStyles: { fillColor: [250, 250, 250] },
+    columnStyles: { 6: { fontStyle: 'bold', textColor: [39, 174, 96] } },
+    margin: { left: 15, right: 15 }
   });
 
+  // ─── EXPENSES TABLE ───
   y = doc.lastAutoTable.finalY + 12;
+  doc.setFontSize(13); doc.text(`Expenses (${expenses.length})`, 15, y);
   if (expenses.length > 0) {
-    if (y > H - 60) { doc.addPage(); y = 25; }
-    doc.setFontSize(13); doc.text('Institutional Expenditures', 20, y);
     doc.autoTable({
       startY: y + 5,
-      head: [['Date', 'Category', 'Description', 'Settlement']],
-      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, safeMoney(e.amount)]),
-      styles: { fontSize: 8, cellPadding: 3 },
+      head: [['Date', 'Category', 'Description', 'Amount']],
+      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, pdfMoney(e.amount)]),
+      styles: { fontSize: 7, cellPadding: 2.5 },
       headStyles: { fillColor: C.red, textColor: C.white },
-      margin: { left: 20, right: 20 },
+      margin: { left: 15, right: 15 }
     });
     y = doc.lastAutoTable.finalY + 12;
+  } else {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.lightGray);
+    doc.text('No expenses for this period.', 15, y + 10);
+    y += 20;
   }
 
-  // Footer for every page
+  // ─── PROFIT & LOSS SUMMARY BOX ───
+  if (y > H - 80) { doc.addPage(); y = 20; }
+  doc.setDrawColor(...C.gold); doc.setFillColor(248, 245, 240); doc.roundedRect(15, y, W - 30, 55, 4, 4, 'FD');
+  doc.setTextColor(...C.navy); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text('Profit & Loss Summary', 25, y + 12);
+  
+  const rows = [
+    { l: 'Total Revenue (Sales)', v: pdfMoney(totalSales), c: [39, 174, 96] },
+    { l: 'Less: Cost of Goods', v: `(${pdfMoney(totalCost)})`, c: [192, 57, 43] },
+    { l: 'Less: Operating Expenses', v: `(${pdfMoney(totalExpenses)})`, c: [192, 57, 43] },
+    { l: 'Less: Returns / Refunds', v: `(${pdfMoney(totalReturns)})`, c: [192, 57, 43] }
+  ];
+
+  rows.forEach((r, i) => {
+    const rowY = y + 22 + (i * 6);
+    doc.setTextColor(80, 80, 80); doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.text(r.l, 25, rowY);
+    doc.setTextColor(...r.c); doc.setFont('helvetica', 'bold'); doc.text(r.v, W - 25, rowY, { align: 'right' });
+  });
+
+  doc.setFillColor(...C.navy); doc.rect(15, y + 45, W - 30, 10, 'F');
+  doc.setTextColor(...C.white); doc.setFontSize(11); doc.text('NET PROFIT', 25, y + 51.5);
+  doc.text(pdfMoney(netProfit), W - 25, y + 51.5, { align: 'right' });
+
+  // ─── FOOTER ───
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.4); doc.line(20, H - 20, W - 20, H - 20);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
-    doc.text('SEREIN BY SEN', 20, H - 14);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text('OFFICIAL BUSINESS ASSET', 20, H - 10);
-    doc.text('PRIVILEGED & CONFIDENTIAL', W / 2, H - 12, { align: 'center' });
-    doc.setFontSize(8); doc.text(`Folio ${p} of ${totalPages}`, W - 20, H - 12, { align: 'right' });
+    doc.setDrawColor(...C.gold); doc.setLineWidth(0.3); doc.line(15, H - 18, W - 15, H - 18);
+    doc.setTextColor(...C.gray); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+    doc.text('SEREIN BY SEN', 15, H - 12);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text('Official Business Document', 15, H - 8);
+    doc.text('PRIVILEGED & CONFIDENTIAL', W / 2, H - 10, { align: 'center' });
+    doc.text(`Folio ${p} of ${totalPages}`, W - 15, H - 10, { align: 'right' });
   }
 
   doc.save(`Serein_Folio_${monthName}_${year}.pdf`);
-  showToast('PDF Exported Perfectly ✅');
+  showToast('PDF Exported Successfully ✅');
 }
 
 // ════════════════════════════════
