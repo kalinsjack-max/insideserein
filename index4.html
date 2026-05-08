@@ -2410,142 +2410,231 @@ function renderReport() {
 }
 
 // ════════════════════════════════
-//  PDF EXPORT
+//  PDF EXPORT (FIXED)
 // ════════════════════════════════
 function exportPDF() {
   const month = parseInt(document.getElementById('reportMonth')?.value ?? new Date().getMonth());
   const year = parseInt(document.getElementById('reportYear')?.value ?? new Date().getFullYear());
   const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month];
 
-  // 1. Data Aggregation
-  const orders = DB.orders.filter(o => { const d = new Date(o.date); return d.getMonth() === month && d.getFullYear() === year; });
-  const expenses = DB.expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === month && d.getFullYear() === year; });
-  const returns = DB.returns.filter(r => { const d = new Date(r.date); return d.getMonth() === month && d.getFullYear() === year; });
+  const orders = appData.orders.filter(o => {
+    const d = new Date(o.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const expenses = appData.expenses.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const returns = appData.returns.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
 
   const totalSales = orders.reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0);
   const totalCost = orders.reduce((s, o) => s + parseFloat(o.cost||0) * parseInt(o.qty||1), 0);
-  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0) + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
+  const totalCollected = orders.filter(o => o.payment === 'paid').reduce((s, o) => s + parseFloat(o.sale||0) * parseInt(o.qty||1), 0)
+    + orders.filter(o => o.payment === 'partial').reduce((s, o) => s + parseFloat(o.paid||0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount||0), 0);
   const totalReturns = returns.reduce((s, r) => s + parseFloat(r.amount||0), 0);
   const netProfit = totalSales - totalCost - totalExpenses - totalReturns;
-  const margin = totalSales > 0 ? ((netProfit / totalSales) * 100).toFixed(1) : 0;
 
-  // PDF Config
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = 210, H = 297;
-  const C = { navy: [44, 62, 80], red: [192, 57, 43], white: [255, 255, 255], gray: [140, 140, 140], bgLight: [248, 245, 240] };
 
-  // Helper for currency to avoid encoding errors
-  const pdfMoney = (n) => "Tk. " + parseFloat(n || 0).toLocaleString('en-BD', {minimumFractionDigits: 2});
+  const W = 210; const H = 297;
+  const C = { red: [192, 57, 43], navy: [44, 62, 80], gold: [184, 134, 11], green: [39, 174, 96], cream: [247, 243, 238], border: [220, 210, 200], white: [255,255,255] };
 
-  // --- HEADER ---
-  doc.setFillColor(...C.navy); doc.rect(0, 0, W, 40, 'F');
-  doc.setFillColor(...C.red); doc.rect(0, 35, W, 5, 'F');
-  
-  doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(28); doc.text('Serein', 15, 18);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text('By Sen', 15, 26);
-  doc.setFontSize(9); doc.setTextColor(200, 200, 200); doc.text('Business Report', 15, 32);
+  // Internal helper to fix the Taka symbol encoding error
+  const pdfMoney = (n) => "Tk. " + parseFloat(n || 0).toLocaleString('en-BD', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  doc.setFillColor(...C.navy);
+  doc.rect(0, 0, W, 45, 'F');
+  doc.setFillColor(...C.red);
+  doc.rect(0, 40, W, 5, 'F');
 
   doc.setTextColor(...C.white);
-  doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.text(`${monthName} ${year}`, W - 15, 18, { align: 'right' });
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 200, 200);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 15, 25, { align: 'right' });
-  doc.text(`Owner: ${DB.settings.owner || 'Sen'}`, W - 15, 30, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(28); doc.text('Serein', 20, 22);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(14); doc.text('By Sen', 20, 31);
+  doc.setFontSize(10);
+  doc.setTextColor(200, 180, 170);
+  doc.text('Business Report', 20, 38);
 
-  // --- TOP STAT BOXES (Fixed Width) ---
-  let y = 50;
-  const boxW = (W - 45) / 4;
-  const stats = [
-    { l: 'TOTAL SALES', v: pdfMoney(totalSales), sub: `Collected: ${pdfMoney(totalCollected)}`, c: [39, 174, 96] },
-    { l: 'TOTAL EXPENSES', v: pdfMoney(totalExpenses), sub: `Returns: ${pdfMoney(totalReturns)}`, c: C.red },
-    { l: 'NET PROFIT', v: pdfMoney(netProfit), sub: `Margin: ${margin}%`, c: [58, 73, 171] },
-    { l: 'ORDERS', v: orders.length.toString(), sub: `Expenses Logged: ${expenses.length}`, c: C.navy }
+  doc.setTextColor(...C.white);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(`${monthName} ${year}`, W - 20, 22, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(180, 170, 165);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W - 20, 30, { align: 'right' });
+  if (appData.settings.owner) doc.text(`Owner: ${appData.settings.owner}`, W - 20, 37, { align: 'right' });
+
+  let y = 55;
+
+  const boxes = [
+    { label: 'Total Sales', val: totalSales, color: C.green, sub: `Collected: ${pdfMoney(totalCollected)}` },
+    { label: 'Total Expenses', val: totalExpenses + totalReturns, color: C.red, sub: `Returns: ${pdfMoney(totalReturns)}` },
+    { label: 'Net Profit', val: netProfit, color: [58, 73, 171], sub: `Margin: ${totalSales > 0 ? ((netProfit/totalSales)*100).toFixed(1) : 0}%` },
+    { label: 'Orders', val: orders.length, color: C.navy, sub: `Expenses logged: ${expenses.length}`, isCount: true },
   ];
 
-  stats.forEach((s, i) => {
-    const x = 15 + (i * (boxW + 5));
-    doc.setDrawColor(220, 220, 220); doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x, y, boxW, 25, 2, 2, 'FD');
-    doc.setFillColor(...s.c); doc.rect(x + 2, y, boxW - 4, 1.5, 'F');
-    doc.setTextColor(...s.c); doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text(s.v, x + boxW/2, y + 10, { align: 'center' });
-    doc.setTextColor(100, 100, 100); doc.setFontSize(6); doc.setFont('helvetica', 'normal');
-    doc.text(s.l, x + boxW/2, y + 15, { align: 'center' });
-    doc.setFontSize(6); doc.text(s.sub, x + boxW/2, y + 20, { align: 'center' });
+  const bw = (W - 40) / 4 - 3;
+  boxes.forEach((b, i) => {
+    const bx = 15 + i * (bw + 4);
+    doc.setFillColor(...C.white);
+    doc.setDrawColor(...C.border);
+    doc.roundedRect(bx, y, bw, 24, 2, 2, 'FD');
+    doc.setFillColor(...b.color);
+    doc.rect(bx, y, bw, 2, 'F');
+    doc.setTextColor(...b.color);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(b.isCount ? 14 : 11);
+    const displayVal = b.isCount ? b.val.toString() : pdfMoney(b.val);
+    doc.text(displayVal, bx + bw/2, y + 12, { align: 'center' });
+    doc.setTextColor(130, 130, 130);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(b.label.toUpperCase(), bx + bw/2, y + 17, { align: 'center' });
+    doc.text(b.sub, bx + bw/2, y + 21.5, { align: 'center' });
   });
 
-  // --- DATA TABLES ---
-  y += 35;
-  doc.setTextColor(...C.navy); doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text(`Orders (${orders.length})`, 15, y);
-  doc.autoTable({
-    startY: y + 3,
-    head: [['Order ID', 'Date', 'Customer', 'Product', 'Sale', 'Cost', 'Profit', 'Payment']],
-    body: orders.map(o => [o.id.slice(-6), fmtDate(o.date), o.customer, o.product, pdfMoney(o.sale), pdfMoney(o.cost), pdfMoney(o.sale - o.cost), o.payment.toUpperCase()]),
-    styles: { fontSize: 7, cellPadding: 2 },
-    headStyles: { fillColor: C.navy },
-    margin: { left: 15, right: 15 }
-  });
+  y += 32;
 
-  y = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(12); doc.text(`Expenses (${expenses.length})`, 15, y);
-  if (expenses.length > 0) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...C.navy);
+  doc.text(`Orders (${orders.length})`, 15, y);
+  y += 5;
+
+  if (orders.length > 0) {
     doc.autoTable({
-      startY: y + 3,
-      head: [['Date', 'Category', 'Description', 'Amount']],
-      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, pdfMoney(e.amount)]),
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: C.red },
-      margin: { left: 15, right: 15 }
+      startY: y,
+      head: [['Order ID', 'Date', 'Customer', 'Product', 'Sale Price', 'Cost', 'Profit', 'Payment']],
+      body: orders.map(o => {
+        const total = parseFloat(o.sale||0) * parseInt(o.qty||1);
+        const cost = parseFloat(o.cost||0) * parseInt(o.qty||1);
+        const profit = total - cost;
+        return [
+          o.id, fmtDate(o.date), o.customer,
+          o.product + (o.qty > 1 ? ` ×${o.qty}` : ''),
+          pdfMoney(total), pdfMoney(cost), pdfMoney(profit), o.payment.toUpperCase()
+        ];
+      }),
+      styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+      headStyles: { fillColor: C.navy, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [250, 247, 243] },
+      columnStyles: {
+        6: { textColor: netProfit >= 0 ? [39,174,96] : [192,57,43], fontStyle: 'bold' },
+        7: { fontStyle: 'bold' }
+      },
+      margin: { left: 15, right: 15 },
     });
     y = doc.lastAutoTable.finalY + 10;
   } else {
-    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text('No expenses recorded.', 15, y + 8);
-    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(160, 160, 160);
+    doc.text('No orders for this period.', 15, y + 5);
+    y += 14;
   }
 
-  // --- PROFIT & LOSS SUMMARY (Exact Image Match) ---
-  if (y > H - 70) { doc.addPage(); y = 20; }
-  doc.setDrawColor(230, 230, 220); doc.setFillColor(...C.bgLight);
+  if (y > H - 60) { doc.addPage(); y = 20; }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...C.navy);
+  doc.text(`Expenses (${expenses.length})`, 15, y);
+  y += 5;
+
+  if (expenses.length > 0) {
+    doc.autoTable({
+      startY: y,
+      head: [['Date', 'Category', 'Description', 'Amount', 'Paid By']],
+      body: expenses.map(e => [fmtDate(e.date), e.category, e.desc, pdfMoney(e.amount), e.paidby]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: C.gold, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [255, 252, 245] },
+      columnStyles: { 3: { textColor: [192,57,43], fontStyle: 'bold' } },
+      margin: { left: 15, right: 15 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(160, 160, 160);
+    doc.text('No expenses for this period.', 15, y + 5);
+    y += 14;
+  }
+
+  if (returns.length > 0) {
+    if (y > H - 50) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...C.navy);
+    doc.text(`Returns (${returns.length})`, 15, y);
+    y += 5;
+    doc.autoTable({
+      startY: y,
+      head: [['Return ID', 'Date', 'Customer', 'Amount', 'Reason', 'Status']],
+      body: returns.map(r => [r.id, fmtDate(r.date), r.customer, pdfMoney(r.amount), r.reason || '—', r.status]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [150, 80, 30], textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+      margin: { left: 15, right: 15 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  if (y > H - 60) { doc.addPage(); y = 20; }
+  doc.setFillColor(...C.cream);
+  doc.setDrawColor(...C.border);
   doc.roundedRect(15, y, W - 30, 50, 3, 3, 'FD');
-  doc.setTextColor(...C.navy); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...C.navy);
   doc.text('Profit & Loss Summary', 20, y + 10);
 
   const rows = [
-    { l: 'Total Revenue (Sales)', v: pdfMoney(totalSales), c: [39, 174, 96] },
-    { l: 'Less: Cost of Goods', v: `(${pdfMoney(totalCost)})`, c: C.red },
-    { l: 'Less: Operating Expenses', v: `(${pdfMoney(totalExpenses)})`, c: C.red },
-    { l: 'Less: Returns / Refunds', v: `(${pdfMoney(totalReturns)})`, c: C.red }
+    ['Total Revenue (Sales)', pdfMoney(totalSales), C.green],
+    ['Less: Cost of Goods', `(${pdfMoney(totalCost)})`, C.red],
+    ['Less: Operating Expenses', `(${pdfMoney(totalExpenses)})`, C.red],
+    ['Less: Returns / Refunds', `(${pdfMoney(totalReturns)})`, C.red],
+    ['NET PROFIT', pdfMoney(netProfit), netProfit >= 0 ? C.green : C.red],
   ];
 
   rows.forEach((r, i) => {
-    const rY = y + 20 + (i * 6);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-    doc.text(r.l, 20, rY);
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(...r.c);
-    doc.text(r.v, W - 20, rY, { align: 'right' });
+    const ry = y + 16 + i * 7;
+    if (i === rows.length - 1) {
+      doc.setFillColor(...C.navy);
+      doc.rect(15, ry - 4, W - 30, 9, 'F');
+      doc.setTextColor(...C.white);
+    } else {
+      doc.setTextColor(80, 80, 80);
+    }
+    doc.setFont('helvetica', i === rows.length - 1 ? 'bold' : 'normal');
+    doc.setFontSize(9);
+    doc.text(r[0], 20, ry + 1);
+    doc.setTextColor(...(i === rows.length - 1 ? C.white : r[2]));
+    doc.setFont('helvetica', 'bold');
+    doc.text(r[1], W - 20, ry + 1, { align: 'right' });
   });
 
-  // Final Net Profit Bar
-  doc.setFillColor(...C.navy); doc.rect(15, y + 42, W - 30, 8, 'F');
-  doc.setTextColor(...C.white); doc.setFontSize(10);
-  doc.text('NET PROFIT', 20, y + 47.5);
-  doc.text(pdfMoney(netProfit), W - 20, y + 47.5, { align: 'right' });
-
-  // --- FOOTER ---
   const totalPages = doc.internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    doc.setDrawColor(200, 180, 150); doc.line(15, H - 15, W - 15, H - 15);
-    doc.setFontSize(7); doc.setTextColor(100, 100, 100);
-    doc.text('SEREIN BY SEN — Business Report', 15, H - 10);
-    doc.text('Confidential', W/2, H - 10, { align: 'center' });
-    doc.text(`Page ${p} of ${totalPages}`, W - 15, H - 10, { align: 'right' });
+    doc.setFillColor(...C.navy);
+    doc.rect(0, H - 12, W, 12, 'F');
+    doc.setTextColor(180, 170, 165);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Serein By Sen — Business Report', 15, H - 4.5);
+    doc.text(`Page ${p} of ${totalPages}`, W - 15, H - 4.5, { align: 'right' });
+    doc.text(`Confidential`, W / 2, H - 4.5, { align: 'center' });
   }
 
   doc.save(`Serein_Report_${monthName}_${year}.pdf`);
-  showToast('Fixed PDF Exported ✅');
+  showToast(`PDF exported: ${monthName} ${year} ✅`);
 }
 
 // ════════════════════════════════
