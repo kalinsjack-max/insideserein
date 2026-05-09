@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serein by Sen - Invoice Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .invoice-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 0;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-bg {
+            height: 120px;
+            width: 100%;
+            position: relative;
+            background: linear-gradient(to right, #b91c1c 0%, #b91c1c 45%, #ef444466 70%, #ffffff 100%);
+        }
+
+        .header-shape-black {
+            position: absolute;
+            top: 0;
+            left: 200px;
+            width: 300px;
+            height: 60px;
+            background-color: #1f2937;
+            transform: skewX(-45deg);
+        }
+
+        .header-shape-red-dark {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 400px;
+            height: 60px;
+            background-color: #991b1b;
+        }
+
+        .footer-bar {
+            height: 60px;
+            background-color: #1f2937;
+            width: 100%;
+            margin-top: auto;
+        }
+
+        @media print {
+            body { background: none; margin: 0; }
+            .no-print { display: none !important; }
+            .invoice-page { margin: 0; box-shadow: none; border: none; }
+            input { border: none !important; background: transparent !important; }
+        }
+
+        input {
+            border-bottom: 1px dotted #ccc;
+            outline: none;
+            padding: 2px 4px;
+            background: transparent;
+        }
+        
+        input:hover {
+            background-color: #f9fafb;
+            border-bottom: 1px solid #b91c1c;
+        }
+
+        .item-row input {
+            width: 100%;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        #logo-preview {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="no-print max-w-[210mm] mx-auto mb-6 flex flex-wrap gap-4 items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800">Serein Invoice Editor</h1>
+            <p class="text-sm text-gray-500">1. Click logo to upload. 2. Edit items. 3. Download PDF.</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="addItem()" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition">
+                + Add Item
+            </button>
+            <button onclick="downloadPDF()" class="bg-red-700 text-white px-6 py-2 rounded font-bold hover:bg-red-800 transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download PDF
+            </button>
+        </div>
+    </div>
+
+    <div id="invoice-content" class="invoice-page">
+        <div class="header-bg">
+            <div class="header-shape-red-dark"></div>
+            <div class="header-shape-black"></div>
+        </div>
+
+        <div class="px-12 py-8 flex-grow">
+            <div class="flex justify-between items-start mb-12">
+                <div class="text-center">
+                    <div class="w-32 h-32 mx-auto mb-2 rounded-full overflow-hidden border border-gray-200 flex items-center justify-center bg-gray-50 relative group">
+                        <input type="file" id="logo-input" class="hidden" accept="image/*" onchange="previewImage(this)">
+                        <img id="logo-preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='9' cy='9' r='2'%3E%3C/circle%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'%3E%3C/path%3E%3C/svg%3E" onclick="document.getElementById('logo-input').click()" title="Click to upload your logo">
+                    </div>
+                    <h2 class="text-3xl font-serif text-[#1F2937] tracking-wider font-bold">Serein</h2>
+                    <p class="text-sm italic text-gray-600">By Sen</p>
+                    <div class="mt-3 text-[10px] text-gray-700 space-y-1">
+                        <div class="flex items-center justify-center gap-1">
+                             <span>📸</span> <input type="text" value="sereinbysen" class="w-20 border-none p-0 text-center">
+                             <span>| f</span> <input type="text" value="Serein by Sen" class="w-24 border-none p-0 text-center">
+                        </div>
+                        <input type="text" value="sereinbysen4002@gmail.com" class="w-48 border-none p-0 text-center">
+                    </div>
+                </div>
+
+                <div class="text-right mt-6">
+                    <div class="flex items-center justify-end gap-2 mb-2">
+                        <span class="font-bold text-gray-800">Order No#</span>
+                        <input type="text" value="1001" class="w-24 text-right border-none font-semibold">
+                    </div>
+                    <div class="flex items-center justify-end gap-2">
+                        <span class="font-bold text-gray-800">Date :</span>
+                        <input type="text" id="currentDate" class="w-24 text-right border-none font-semibold">
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4 mb-12 max-w-2xl">
+                <div class="flex items-end">
+                    <span class="font-bold text-lg min-w-[90px]">Name:</span>
+                    <input type="text" placeholder=".................................................................................................................................." class="flex-grow">
+                </div>
+                <div class="flex items-end">
+                    <span class="font-bold text-lg min-w-[90px]">Phone:</span>
+                    <input type="text" placeholder=".................................................................................................................................." class="flex-grow">
+                </div>
+                <div class="flex items-end">
+                    <span class="font-bold text-lg min-w-[90px]">Address:</span>
+                    <input type="text" placeholder=".................................................................................................................................." class="flex-grow">
+                </div>
+            </div>
+
+            <table class="w-full mb-8">
+                <thead>
+                    <tr class="border-t-2 border-b-2 border-gray-800">
+                        <th class="py-3 text-left font-bold text-gray-800 pl-2">Item</th>
+                        <th class="py-3 text-right font-bold text-gray-800 w-24">Quantity</th>
+                        <th class="py-3 text-right font-bold text-gray-800 w-32">Unit Price</th>
+                        <th class="py-3 text-right font-bold text-gray-800 w-32 pr-2">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="items-body">
+                    <tr class="item-row border-b border-gray-200">
+                        <td class="py-3 pl-2 flex items-center">
+                            <button onclick="this.closest('tr').remove(); updateGrandTotal();" class="no-print text-red-500 mr-2 text-xs opacity-50 hover:opacity-100">✕</button>
+                            <input type="text" placeholder="Item name..." class="border-none">
+                        </td>
+                        <td class="py-3 text-right"><input type="number" value="1" oninput="calculateRow(this)" class="text-right border-none qty"></td>
+                        <td class="py-3 text-right"><input type="number" value="0" oninput="calculateRow(this)" class="text-right border-none price"></td>
+                        <td class="py-3 text-right pr-2"><input type="number" value="0.00" oninput="updateGrandTotal()" class="text-right border-none font-semibold total-cell"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="flex justify-end mb-12">
+                <div class="w-72 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-gray-800">Subtotal -</span>
+                        <input type="number" id="subtotal" value="0.00" class="text-right w-24 border-none font-semibold" oninput="updateDue()">
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-gray-800">Paid -</span>
+                        <input type="number" value="0" oninput="updateDue()" class="text-right w-24 border-none" id="paid">
+                    </div>
+                    <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+                        <span class="font-bold text-gray-800">Due -</span>
+                        <input type="number" id="due" value="0.00" class="text-right w-24 border-none font-semibold">
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <span class="text-2xl font-bold text-gray-800">Total -</span>
+                        <input type="number" id="grand-total" value="0.00" class="text-2xl font-bold text-right w-32 border-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-end mt-20">
+                <div class="flex-grow mr-4">
+                    <input type="text" value="Thank you for your purchase!" class="text-2xl italic font-semibold text-gray-800 border-none w-full placeholder-gray-400">
+                </div>
+                <div class="text-center w-64 flex-shrink-0">
+                    <div class="mb-1">
+                        <input type="text" placeholder="Type name here" class="text-center border-none font-medium text-gray-800 w-full italic">
+                    </div>
+                    <div class="border-t-2 border-gray-800 pt-2 font-bold text-gray-800">
+                        Authorized Signed
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bar"></div>
+    </div>
+
+    <script>
+        document.getElementById('currentDate').value = new Date().toLocaleDateString();
+
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('logo-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function addItem() {
+            const tbody = document.getElementById('items-body');
+            const tr = document.createElement('tr');
+            tr.className = "item-row border-b border-gray-200";
+            tr.innerHTML = `
+                <td class="py-3 pl-2 flex items-center">
+                    <button onclick="this.closest('tr').remove(); updateGrandTotal();" class="no-print text-red-500 mr-2 text-xs opacity-50 hover:opacity-100">✕</button>
+                    <input type="text" placeholder="Item name..." class="border-none">
+                </td>
+                <td class="py-3 text-right"><input type="number" value="1" oninput="calculateRow(this)" class="text-right border-none qty"></td>
+                <td class="py-3 text-right"><input type="number" value="0" oninput="calculateRow(this)" class="text-right border-none price"></td>
+                <td class="py-3 text-right pr-2"><input type="number" value="0.00" oninput="updateGrandTotal()" class="text-right border-none font-semibold total-cell"></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function calculateRow(input) {
+            const row = input.closest('tr');
+            const qty = parseFloat(row.querySelector('.qty').value) || 0;
+            const price = parseFloat(row.querySelector('.price').value) || 0;
+            const totalCell = row.querySelector('.total-cell');
+            const total = qty * price;
+            totalCell.value = total.toFixed(2);
+            updateGrandTotal();
+        }
+
+        function updateGrandTotal() {
+            const totals = document.querySelectorAll('.total-cell');
+            let subtotal = 0;
+            totals.forEach(cell => {
+                subtotal += parseFloat(cell.value) || 0;
+            });
+            document.getElementById('subtotal').value = subtotal.toFixed(2);
+            document.getElementById('grand-total').value = subtotal.toFixed(2);
+            updateDue();
+        }
+
+        function updateDue() {
+            const subtotal = parseFloat(document.getElementById('subtotal').value) || 0;
+            const paid = parseFloat(document.getElementById('paid').value) || 0;
+            const due = subtotal - paid;
+            document.getElementById('due').value = due.toFixed(2);
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('invoice-content');
+            const inputs = element.querySelectorAll('input');
+            const noPrintElements = element.querySelectorAll('.no-print');
+            const originalData = [];
+
+            // Hide cross signs and prepare inputs for PDF
+            noPrintElements.forEach(el => el.style.visibility = 'hidden');
+            
+            inputs.forEach((input, index) => {
+                if(!input.value && input.placeholder.includes('.')) {
+                    originalData[index] = { p: input.placeholder };
+                    input.placeholder = '';
+                }
+                input.style.border = 'none';
+            });
+
+            const opt = {
+                margin: 0,
+                filename: 'Serein_Invoice.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 3, useCORS: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Restore elements after download
+                noPrintElements.forEach(el => el.style.visibility = 'visible');
+                inputs.forEach((input, index) => {
+                    if(originalData[index]) input.placeholder = originalData[index].p;
+                    input.style.border = '';
+                });
+            });
+        }
+    </script>
+</body>
+</html>
